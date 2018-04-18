@@ -1,0 +1,28 @@
+[
+  {
+    "id": 1,
+    "cpf": "12345678910",
+    "name": "João Batista",
+    "email": "test@test.com",
+    "admin": false,
+    "sensorID": 1
+  },
+
+  {
+    "id": 2,
+    "cpf": "14725836910",
+    "name": "Elisangela Silva",
+    "email": "elissilva@test.com",
+    "admin": false,
+    "sensorID": 2
+  },
+
+  {
+    "id": 3,
+    "cpf": "11111111111",
+    "name": "Lucas Afonso",
+    "email": "laraujo@test.com",
+    "admin": false,
+    "sensorID": 3
+  }
+]
