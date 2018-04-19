@@ -1,9 +1,9 @@
 import QtQuick 2.6
 import QtQuick.Layouts 1.3
-import QtQuick.Controls 1.2
+import QtQuick.Layouts 1.2
+import QtQuick.Controls 1.4
 import QtQuick.Controls 2.0
 import QtQuick.Controls.Material 2.0
-import QtQml 2.0
 
 
   Pane {
@@ -15,10 +15,11 @@ import QtQml 2.0
           anchors.left: parent.left
 
           RowLayout {
+              Layout.fillWidth: true
 
               TextField {
                   id: textDate
-                  width: 300
+                  Layout.fillWidth: true
                   height: 33
                   placeholderText: qsTr("Text Field")
                   text:Qt.formatDate(cal.selectedDate, "dd-MM-yyyy")
@@ -44,10 +45,11 @@ import QtQml 2.0
           }
 
           RowLayout {
+          Layout.fillWidth: true
 
               TextField {
                   id: textDate2
-                  width: 300
+                  Layout.fillWidth: true
                   height: 33
                   placeholderText: qsTr("Text Field")
                   text:Qt.formatDate(cal2.selectedDate, "dd-MM-yyyy")
@@ -88,7 +90,7 @@ import QtQml 2.0
 
               Pane {
                   id: hPane
-                  width: window.width
+                  Layout.fillWidth: true
                   Layout.fillHeight: true
 
                   ListModel {
@@ -96,15 +98,16 @@ import QtQml 2.0
                   }
 
                   TableView {
-                      backgroundVisible: false
+                      anchors.fill: parent
+//                      backgroundVisible: false
                       Layout.fillHeight: true
-                      alternatingRowColors: false
-                      width: 350
+                      Layout.fillWidth: true
+                      alternatingRowColors: true
 
                       TableViewColumn {
                           role: "date"
                           title: "Data"
-                          width: 200
+                          width: 150
                       }
 
                       TableViewColumn {
@@ -116,60 +119,28 @@ import QtQml 2.0
                       model: listModel
                   }
 
-//                      ListView {
-//                          id: listView
-//                          anchors.fill: parent
-//                          model: listModel
-//                          width: parent.width
-//
-//                          delegate: Item {
-//                              id: delegateItem
-//                              width: parent.width; height: 100
-//
-//
-//                              Text {
-//                                  id: dateItemTxt
-//                                  height: parent.height; width: 150
-//                                  anchors.left: parent.left
-//                                  // delegate can directly use ListElement role name
-//                                  text: new Date(model.date).toLocaleString(Qt.locale("pt_BR"), "dd/MM/yy HH:mm:ss")
-//                              }
-//
-//
-//                              Text {
-//                                  id: itexItem
-//                                  anchors.left: dateItemTxt.right
-//                                  anchors.leftMargin: 20
-////                                  anchors.verticalCenter: parent.verticalCenter
-////                                  font.pixelSize: 40
-//                                  // delegate can directly use ListElement role name
-//                                  text: model.measure
-//                              }
-//                          }
-//
-//
-//                      }
 
                   Connections {
                      target: Controller
                      onGetConsumption: {
 
-                       var jsonObject = JSON.parse(consumptions);
+                        var jsonObject = JSON.parse(consumptions);
+                        listModel.clear()
 
-                       Object.keys(jsonObject).forEach(function(k) {
+                        Object.keys(jsonObject).forEach(function(k) {
 
-                         jsonObject[k].forEach(function(c){
+                          jsonObject[k].forEach(function(c){
+
                            listModel.append({
                              date: new Date(c.date).toLocaleString(Qt.locale("pt_BR"), "dd/MM/yy HH:mm:ss"),
                              measure: c.measure
                            })
 
-                           console.log(listModel.count)
-                         })
+                          })
 
-                       })
+                        })
 
-                       console.log(Object.keys(jsonObject))
+//                       console.log(Object.keys(jsonObject))
                      }
                   }
               }

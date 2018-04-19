@@ -7,6 +7,7 @@ type User struct {
 	Email		string 	`json:"email"`
 	Admin  		bool 	`json:"admin"`
 	SensorID 	int 	`json:"sensorID"`
+	Zone		int 	`json:"zone"`
 }
 
 type Request struct {

@@ -876,6 +876,51 @@ func (ptr *Controller) GetConsumptions(userID int, start string, end string) {
 	}
 }
 
+//export callbackController6356b5_GetConsumptionsZone
+func callbackController6356b5_GetConsumptionsZone(ptr unsafe.Pointer, zone C.int, start C.struct_Moc_PackedString, end C.struct_Moc_PackedString) {
+	if signal := qt.GetSignal(ptr, "getConsumptionsZone"); signal != nil {
+		signal.(func(int, string, string))(int(int32(zone)), cGoUnpackString(start), cGoUnpackString(end))
+	}
+
+}
+
+func (ptr *Controller) ConnectGetConsumptionsZone(f func(zone int, start string, end string)) {
+	if ptr.Pointer() != nil {
+
+		if signal := qt.LendSignal(ptr.Pointer(), "getConsumptionsZone"); signal != nil {
+			qt.ConnectSignal(ptr.Pointer(), "getConsumptionsZone", func(zone int, start string, end string) {
+				signal.(func(int, string, string))(zone, start, end)
+				f(zone, start, end)
+			})
+		} else {
+			qt.ConnectSignal(ptr.Pointer(), "getConsumptionsZone", f)
+		}
+	}
+}
+
+func (ptr *Controller) DisconnectGetConsumptionsZone() {
+	if ptr.Pointer() != nil {
+
+		qt.DisconnectSignal(ptr.Pointer(), "getConsumptionsZone")
+	}
+}
+
+func (ptr *Controller) GetConsumptionsZone(zone int, start string, end string) {
+	if ptr.Pointer() != nil {
+		var startC *C.char
+		if start != "" {
+			startC = C.CString(start)
+			defer C.free(unsafe.Pointer(startC))
+		}
+		var endC *C.char
+		if end != "" {
+			endC = C.CString(end)
+			defer C.free(unsafe.Pointer(endC))
+		}
+		C.Controller6356b5_GetConsumptionsZone(ptr.Pointer(), C.int(int32(zone)), C.struct_Moc_PackedString{data: startC, len: C.longlong(len(start))}, C.struct_Moc_PackedString{data: endC, len: C.longlong(len(end))})
+	}
+}
+
 //export callbackController6356b5_SessionAuthenticated
 func callbackController6356b5_SessionAuthenticated(ptr unsafe.Pointer, reply C.struct_Moc_PackedString) {
 	if signal := qt.GetSignal(ptr, "sessionAuthenticated"); signal != nil {

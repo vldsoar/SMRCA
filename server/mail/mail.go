@@ -52,7 +52,7 @@ func New(to string, body string) Mail {
 func ConnectAndSend(mail Mail)  {
 	smtpServer := SmtpServer{host: "smtp.gmail.com", port: "465"}
 
-	f, err := os.Open("./mail/config.json")
+	f, err := os.Open("server/mail/config.json")
 
 	if err != nil {
 		panic(err)
@@ -123,6 +123,7 @@ func ConnectAndSend(mail Mail)  {
 	}
 
 	client.Quit()
-
+	log.Println("--------------------------")
 	log.Println("Email enviado com sucesso")
+	log.Println("--------------------------")
 }

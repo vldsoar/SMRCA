@@ -30,6 +30,7 @@ type Controller struct {
 	_ func() 			`slot:"logout"`
 	_ func(userID int) string 	`slot:"getConsumptionValue"`
 	_ func(userID int, start string, end string) `slot:"getConsumptions"`
+	_ func(zone int, start string, end string) `slot:"getConsumptionsZone"`
 
 	_ func(reply string) `signal:"sessionAuthenticated"`
 	_ func() 			 `signal:"sessionAuthenticationError"`
@@ -49,14 +50,6 @@ var controller = NewController(nil)
 
 func main() {
 
-	core.QCoreApplication_SetApplicationName("Monitoramento de Consumo")
-	core.QCoreApplication_SetOrganizationName("QtProject")
-	core.QCoreApplication_SetAttribute(core.Qt__AA_EnableHighDpiScaling, true)
-
-	gui.NewQGuiApplication(len(os.Args), os.Args)
-
-	quickcontrols2.QQuickStyle_SetStyle("material")
-
 	conf = config.LoadConfig()
 
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", conf.Host, conf.Port))
@@ -67,6 +60,26 @@ func main() {
 
 	exit := make(chan bool)
 
+	guiInterface(exit)
+
+
+	for {
+		select {
+		case <-exit:
+			os.Exit(1)
+		}
+	}
+
+}
+
+func guiInterface(exit chan bool) {
+	core.QCoreApplication_SetApplicationName("Monitoramento de Consumo")
+	core.QCoreApplication_SetAttribute(core.Qt__AA_EnableHighDpiScaling, true)
+
+	gui.NewQGuiApplication(len(os.Args), os.Args)
+
+	quickcontrols2.QQuickStyle_SetStyle("material")
+
 	Client_QmlRegisterType2("Client", 1, 0, "Client")
 
 	var engine = qml.NewQQmlApplicationEngine(nil)
@@ -74,12 +87,18 @@ func main() {
 
 	engine.RootContext().SetContextProperty("Controller", controller)
 
+	functionsController(exit)
+
+	gui.QGuiApplication_Exec()
+}
+
+func functionsController(exit chan bool)  {
 	controller.ConnectLogin(func(cpf string) {
 		req := shared.Request{"login", "POST", nil}
 
 		req.Params = map[string]interface{}{"cpf": cpf}
 
-		json.NewEncoder(conn).Encode(req)
+		json.NewEncoder(controller.Conn).Encode(req)
 
 		mutex := &sync.Mutex{}
 
@@ -112,7 +131,7 @@ func main() {
 				controller.SessionAuthenticationError()
 			}
 
-		}(conn)
+		}(controller.Conn)
 
 	})
 
@@ -128,7 +147,7 @@ func main() {
 		req.Params = map[string]interface{}{"startDate": t, "endDate": t, "sensorID": userID}
 
 		// write in socket
-		err := json.NewEncoder(conn).Encode(req)
+		err := json.NewEncoder(controller.Conn).Encode(req)
 
 		if err != nil {
 			return "0"
@@ -136,7 +155,7 @@ func main() {
 
 		var res shared.Response
 		// read from socket
-		err = json.NewDecoder(conn).Decode(&res)
+		err = json.NewDecoder(controller.Conn).Decode(&res)
 
 		if err != nil || !res.Success {
 			return "0"
@@ -155,13 +174,13 @@ func main() {
 		return strconv.Itoa(result)
 
 	})
-	
+
 	controller.ConnectGetConsumptions(func(userID int, start string, end string) {
 		req := shared.Request{"consumptions", "GET", nil}
 
 		req.Params = map[string]interface{}{"startDate": start, "endDate": end, "sensorID": userID}
 
-		err := json.NewEncoder(conn).Encode(req)
+		err := json.NewEncoder(controller.Conn).Encode(req)
 
 		if err != nil {
 			fmt.Println(err)
@@ -170,7 +189,7 @@ func main() {
 
 		var res shared.Response
 
-		err = json.NewDecoder(conn).Decode(&res)
+		err = json.NewDecoder(controller.Conn).Decode(&res)
 
 		if err != nil || !res.Success {
 			fmt.Println(err)
@@ -184,15 +203,33 @@ func main() {
 		controller.GetConsumption(string(d))
 	})
 
-	gui.QGuiApplication_Exec()
+	controller.ConnectGetConsumptionsZone(func(zone int, start string, end string) {
+		req := shared.Request{"consumptionsZone", "GET", nil}
 
-	endless: for {
-		select {
-		case <-exit:
-			break endless
+		req.Params = map[string]interface{}{"startDate": start, "endDate": end, "zone": zone}
+
+		err := json.NewEncoder(controller.Conn).Encode(req)
+
+		if err != nil {
+			fmt.Println(err)
+			return
 		}
-	}
 
+		var res shared.Response
+
+		err = json.NewDecoder(controller.Conn).Decode(&res)
+
+		if err != nil || !res.Success {
+			fmt.Println(err)
+			return
+		}
+
+		arr := res.Data
+
+		d, _ := json.Marshal(arr)
+
+		controller.GetConsumption(string(d))
+	})
 }
 
 func checkError(err error) {

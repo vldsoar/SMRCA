@@ -5,24 +5,36 @@
     "name": "João Batista",
     "email": "test@test.com",
     "admin": false,
-    "sensorID": 1
+    "sensorID": 1,
+    "zone": 1
   },
 
   {
     "id": 2,
     "cpf": "14725836910",
     "name": "Elisangela Silva",
-    "email": "elissilva@test.com",
+    "email": "velder.vas@gmail.com",
     "admin": false,
-    "sensorID": 2
+    "sensorID": 2,
+    "zone": 1
   },
 
   {
     "id": 3,
     "cpf": "11111111111",
     "name": "Lucas Afonso",
-    "email": "laraujo@test.com",
+    "email": "velder.vas@gmail.com",
     "admin": false,
-    "sensorID": 3
+    "sensorID": 3,
+    "zone": 2
+  },
+  {
+    "id": 3,
+    "cpf": "01020304050",
+    "name": "Velder Soares",
+    "email": "velder.vas@gmail.com",
+    "admin": true,
+    "sensorID": 0,
+    "zone": 999
   }
 ]

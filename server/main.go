@@ -9,24 +9,13 @@ import (
 	"log"
 	"io"
 	"bytes"
-	"reflect"
 	"client-server/server/db"
 	"flag"
 	"time"
 	"client-server/server/mail"
+	"strconv"
+	"client-server/shared"
 )
-
-type Request struct {
-	Method string `json:"method"`
-	Action string `json:"action"`
-	Params map[string]interface{} `json:"params,omitempty"`
-}
-
-type Response struct {
-	Success bool                   `json:"success"`
-	Error   string                 `json:"error,omitempty"`
-	Data    map[string]interface{} `json:"data,omitempty"`
-}
 
 type Model interface {
 	save()
@@ -162,16 +151,34 @@ func main() {
 	// connect udp server
 	conn, err := net.ListenUDP("udp", udpAddr)
 
-	defer conn.Close()
+	//defer conn.Close()
+
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	//
+	emailChan := make(chan string)
+
+	listSensorsEmail := make(map[string]bool)
+
 	for {
 		fmt.Printf("Accepting a new packet\n")
 
-		handleUDPConnection(conn)
+		handleUDPConnection(conn, emailChan)
+
+		select {
+		case sensorID := <-emailChan:
+
+			if listSensorsEmail[sensorID] {
+				break
+			}
+
+			listSensorsEmail[sensorID] = true
+
+			id, _ := strconv.Atoi(sensorID)
+
+			go sendMail(id)
+		}
 	}
 
 
@@ -189,8 +196,8 @@ func startServerTCP(ip string, port string) {
 
 	newConnections := make(chan net.Conn)
 
-	//messages := make(chan string)
-
+	// The server always supports new connections and
+	// will add the new connection on the channel
 	go func() {
 		for {
 			conn, err := serverTCP.Accept()
@@ -204,16 +211,21 @@ func startServerTCP(ip string, port string) {
 		}
 	}()
 
+
+	// infinite loop
 	for {
 		select {
+		// accept new customers
 		case conn := <-newConnections:
 
 			defer conn.Close()
 
+			// Always listen to requests from this customer
+			// and send you an answer
 			go func(conn net.Conn) {
 
 				for {
-					var req Request
+					var req shared.Request
 
 					err := json.NewDecoder(conn).Decode(&req)
 
@@ -221,7 +233,7 @@ func startServerTCP(ip string, port string) {
 						break
 					}
 
-					res := handleRequest(req)
+					res := handleRequest(req, nil)
 
 					json.NewEncoder(conn).Encode(res)
 				}
@@ -237,7 +249,7 @@ func startServerTCP(ip string, port string) {
 
 
 // Handle all connections in UDP Server
-func handleUDPConnection(conn *net.UDPConn)  {
+func handleUDPConnection(conn *net.UDPConn, ch chan string)  {
 
 	buf := make([]byte, 2048)
 
@@ -249,8 +261,9 @@ func handleUDPConnection(conn *net.UDPConn)  {
 		return
 	}
 
-	var req Request
+	var req shared.Request
 
+	// unnmarshalling buffer read Request
 	err = json.Unmarshal(buf[:n], &req)
 
 	if err != nil {
@@ -258,21 +271,112 @@ func handleUDPConnection(conn *net.UDPConn)  {
 		return
 	}
 
-	go handleRequest(req)
+	go handleRequest(req, ch)
 
 }
 
 
-func handleRequest(req Request) Response {
+func handleRequest(req shared.Request, ch chan string) shared.Response {
 
 	fmt.Printf("Request: %+v\n", req)
 
-	res := Response{}
+	res := shared.Response{}
 
 	switch req.Action {
 	case "GET":
 
 		switch req.Method {
+		case "consumptionsZone":
+
+			j, err := db.Load("users")
+
+			if err != nil {
+				fmt.Println(err)
+				break
+			}
+
+			// get the value of the zone and convert it from float to int
+			zone := int(req.Params["zone"].(float64))
+
+			layoutDate := "02-01-2006"
+
+			// initialize a Time 'object' with startDate
+			startDate, _ := time.Parse(layoutDate, req.Params["startDate"].(string))
+			// initialize a Time 'object' with startDate
+			endDate, _ := time.Parse(layoutDate, req.Params["endDate"].(string))
+			// Add 1 day in endDate
+			endDate = endDate.AddDate(0, 0, 1)
+
+			selectUsers := []map[string]interface{}{}
+
+			// get users with zone equal zone of params
+			for _, user := range j.MustArray() {
+				u := user.(map[string]interface{})
+
+				zoneNum, _ := u["zone"].(json.Number).Int64()
+
+				if zoneNum == int64(zone) {
+					selectUsers = append(selectUsers, u)
+				}
+			}
+
+			mapToReturn := make(map[string]interface{})
+
+			// For each user in SelectUsers, get measures
+			// and verify that measure is between start and end date
+			for _, user := range selectUsers {
+
+				sensorID, _ := strconv.Atoi(user["sensorID"].(json.Number).String())
+
+				jSensor, err := db.GetSensor(sensorID)
+
+				if err != nil {
+					fmt.Println(err)
+					res.Error = err.Error()
+					break
+				}
+
+				measures, err := jSensor.Get("measures").Array()
+
+				if err != nil {
+					fmt.Println(err)
+					res.Error = err.Error()
+					break
+				}
+
+				for _, consumption := range measures {
+					var c ConsumptionInfo
+
+					jCons, _ := json.Marshal(consumption)
+
+					json.Unmarshal(jCons, &c)
+
+					t, _ := time.Parse(time.RFC3339, c.Date)
+
+					if inTimeSpan(startDate, endDate, t) {
+						userID := user["id"].(json.Number).String()
+						arrMeasures := mapToReturn[userID]
+
+						//fmt.Println(c)
+
+						if arrMeasures != nil {
+							temp := arrMeasures.([]interface{})
+							arrMeasures = append(temp, c)
+							mapToReturn[userID] = arrMeasures
+						} else {
+							arr := []interface{}{c}
+							mapToReturn[userID] = arr
+						}
+					}
+
+				}
+
+			}
+
+			if len(mapToReturn) > 0 {
+				res.Success = true
+				res.Data = mapToReturn
+			}
 
 		case "consumptions":
 			layoutDate := "02-01-2006"
@@ -315,7 +419,7 @@ func handleRequest(req Request) Response {
 					if temp != nil {
 						parse := temp.([]interface{})
 						updateList := append(parse, c)
-						retAr[t.Format(layoutDate)]= updateList
+						retAr[t.Format(layoutDate)] = updateList
 					} else {
 						retAr[t.Format(layoutDate)] = []interface{}{c}
 					}
@@ -342,19 +446,19 @@ func handleRequest(req Request) Response {
 
 			newInfo := ConsumptionInfo{id,date, measure}
 
-			wasSaved := newInfo.save()
+			save := newInfo.save()
 
-			if wasSaved {
-				handleMsgRequest(1, reflect.TypeOf(newInfo).Kind().String())
+			if save {
+				handleMsgRequest(1, "ConsumptionInfo")
 
-				if measure > 15000 {
-					sendMail(id)
+				if measure > 5000 {
+					ch <- strconv.Itoa(id)
 				}
 
 				break
 			}
 
-			handleMsgRequest(0, reflect.TypeOf(newInfo).Kind().String())
+			handleMsgRequest(0, "ConsumptionInfo")
 
 		case "login":
 			// Load all users
@@ -389,6 +493,10 @@ func handleRequest(req Request) Response {
 	return res
 }
 
+func checkLimit(req shared.Request) {
+
+}
+
 func sendMail(id int) {
 	jSensor, err := db.GetSensor(id)
 
@@ -397,14 +505,14 @@ func sendMail(id int) {
 		return
 	}
 
-	jUser, err := db.GetUser(jSensor.Get("userID").MustInt())
+	jUser, err := db.GetUser(jSensor.Get("user_id").MustInt())
 
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-
-	newMail := mail.New(jUser.Get("email").MustString(), "O limite estipulado foi atingindo")
+	
+	newMail := mail.New(jUser.Get("email").MustString(), "O limite de 5.000 ml³ estipulado foi atingindo")
 
 	mail.ConnectAndSend(newMail)
 }

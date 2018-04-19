@@ -124,7 +124,11 @@ ApplicationWindow {
 
                   data.text = "Usuário '"+ login.text +"' Autenticado \n\n"
 
-                  stackView.push("qrc:///qml/pages/SwipePage.qml")
+                  if (client.data.admin) {
+                    stackView.push("qrc:///qml/pages/HomeADMPage.qml")
+                  } else {
+                    stackView.push("qrc:///qml/pages/SwipePage.qml")
+                  }
 
                 }
                 onSessionAuthenticationError: {
